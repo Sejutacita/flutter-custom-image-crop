@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 
 /// Draw a dotted path around the given path
-class DottedCropPathPainter extends CustomPainter {
+class CircleCropPathPainter extends CustomPainter {
   static const _dashWidth = 10.0;
-  static const _dashSpace = 10.0;
   static const _strokeWidth = 4.0;
   final Path _path;
   final _paint = Paint()
@@ -13,11 +12,11 @@ class DottedCropPathPainter extends CustomPainter {
     ..strokeJoin = StrokeJoin.round;
 
   /// Draw a dotted path around the given path
-  DottedCropPathPainter(this._path);
+  CircleCropPathPainter(this._path);
 
   /// Return a CustomPaint widget with the current CustomPainter
   static CustomPaint drawPath(Path path) =>
-      CustomPaint(painter: DottedCropPathPainter(path));
+      CustomPaint(painter: CircleCropPathPainter(path));
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -30,13 +29,12 @@ class DottedCropPathPainter extends CustomPainter {
           Offset.zero,
         );
         distance += _dashWidth;
-        distance += _dashSpace;
       }
     }
     canvas.drawPath(dashPath, _paint);
   }
 
   @override
-  bool shouldRepaint(covariant DottedCropPathPainter oldClipper) =>
+  bool shouldRepaint(covariant CircleCropPathPainter oldClipper) =>
       oldClipper._path != _path;
 }

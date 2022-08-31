@@ -1,3 +1,5 @@
+// ignore_for_file: comment_references, lines_longer_than_80_chars
+
 import 'dart:async';
 import 'dart:math';
 import 'dart:ui' as ui;
@@ -6,10 +8,11 @@ import 'package:flutter/material.dart';
 import 'package:gesture_x_detector/gesture_x_detector.dart';
 import 'package:vector_math/vector_math_64.dart' as vector_math;
 
-import 'package:custom_image_crop/src/controllers/controller.dart';
-import 'package:custom_image_crop/src/painters/dotted_path_painter.dart';
-import 'package:custom_image_crop/src/clippers/inverted_clipper.dart';
-import 'package:custom_image_crop/src/models/model.dart';
+import '../clippers/inverted_clipper.dart';
+import '../controllers/controller.dart';
+import '../models/model.dart';
+import '../painters/circle_path_painter.dart';
+import '../painters/dotted_path_painter.dart';
 
 /// An image cropper that is customizable.
 /// You can rotate, scale and translate either
@@ -59,13 +62,20 @@ class CustomImageCrop extends StatefulWidget {
   /// we've provided two default painters as inspiration
   /// `DottedCropPathPainter.drawPath` and
   /// `SolidCropPathPainter.drawPath`
+
+  final double height;
+
+  final double width;
+
   CustomImageCrop({
     required this.image,
     required this.cropController,
+    required this.height,
+    this.width = double.infinity,
     this.overlayColor = const Color.fromRGBO(0, 0, 0, 0.5),
-    this.backgroundColor = Colors.white,
-    this.shape = CustomCropShape.Circle,
-    this.cropPercentage = 0.8,
+    this.backgroundColor = const Color(0xFF1A1A1A),
+    this.shape = CustomCropShape.CircleDottedLine,
+    this.cropPercentage = 0.62,
     this.drawPath = DottedCropPathPainter.drawPath,
     Paint? imagePaintDuringCrop,
     Key? key,
@@ -74,21 +84,28 @@ class CustomImageCrop extends StatefulWidget {
         super(key: key);
 
   @override
-  _CustomImageCropState createState() => _CustomImageCropState();
+  State<CustomImageCrop> createState() => _CustomImageCropState();
 }
 
 class _CustomImageCropState extends State<CustomImageCrop>
     with CustomImageCropListener {
   CropImageData? _dataTransitionStart;
   late Path _path;
-  late double _width, _height;
+  late double _width;
+  late double _height;
   ui.Image? _imageAsUIImage;
   ImageStream? _imageStream;
   ImageStreamListener? _imageListener;
+  late CustomPaint Function(Path) _drawPath;
 
   @override
   void initState() {
     super.initState();
+    if (widget.shape == CustomCropShape.Circle) {
+      _drawPath = CircleCropPathPainter.drawPath;
+    } else {
+      _drawPath = widget.drawPath;
+    }
     widget.cropController.addListener(this);
   }
 
@@ -110,7 +127,7 @@ class _CustomImageCropState extends State<CustomImageCrop>
     }
   }
 
-  void _updateImage(ImageInfo imageInfo, _) {
+  void _updateImage(ImageInfo imageInfo, dynamic _) {
     setState(() {
       _imageAsUIImage = imageInfo.image;
     });
@@ -128,59 +145,65 @@ class _CustomImageCropState extends State<CustomImageCrop>
   @override
   Widget build(BuildContext context) {
     final image = _imageAsUIImage;
-    if (image == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        _width = constraints.maxWidth;
-        _height = constraints.maxHeight;
-        final cropWidth = min(_width, _height) * widget.cropPercentage;
-        final defaultScale = cropWidth / max(image.width, image.height);
-        final scale = data.scale * defaultScale;
-        _path = _getPath(cropWidth, _width, _height);
-        return XGestureDetector(
-          onMoveStart: onMoveStart,
-          onMoveUpdate: onMoveUpdate,
-          onScaleStart: onScaleStart,
-          onScaleUpdate: onScaleUpdate,
-          child: Container(
-            width: _width,
-            height: _height,
-            color: widget.backgroundColor,
-            child: Stack(
-              children: [
-                Positioned(
-                  left: data.x + _width / 2,
-                  top: data.y + _height / 2,
-                  child: Transform(
-                    transform: Matrix4.diagonal3(
-                        vector_math.Vector3(scale, scale, scale))
-                      ..rotateZ(data.angle)
-                      ..translate(-image.width / 2, -image.height / 2),
-                    child: Image(
-                      image: widget.image,
+
+    return SizedBox(
+      height: widget.height,
+      width: widget.width,
+      child: image == null
+          ? const Center(child: CircularProgressIndicator())
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                _width = constraints.maxWidth;
+                _height = constraints.maxHeight;
+                final cropWidth = min(_width, _height) * widget.cropPercentage;
+                final defaultScale = cropWidth / max(image.width, image.height);
+                final scale = data.scale * defaultScale;
+                _path = _getPath(cropWidth, _width, _height);
+
+                return XGestureDetector(
+                  onMoveStart: onMoveStart,
+                  onMoveUpdate: onMoveUpdate,
+                  onScaleStart: onScaleStart,
+                  onScaleUpdate: onScaleUpdate,
+                  child: Container(
+                    width: _width,
+                    height: _height,
+                    color: widget.backgroundColor,
+                    child: Stack(
+                      children: [
+                        Positioned(
+                          left: data.x + _width / 2,
+                          top: data.y + _height / 2,
+                          child: Transform(
+                            transform: Matrix4.diagonal3(
+                              vector_math.Vector3(scale, scale, scale),
+                            )
+                              ..rotateZ(data.angle)
+                              ..translate(-image.width / 2, -image.height / 2),
+                            child: Image(
+                              image: widget.image,
+                            ),
+                          ),
+                        ),
+                        IgnorePointer(
+                          child: ClipPath(
+                            clipper: InvertedClipper(_path, _width, _height),
+                            child: Container(
+                              color: widget.overlayColor,
+                            ),
+                          ),
+                        ),
+                        _drawPath(_path),
+                      ],
                     ),
                   ),
-                ),
-                IgnorePointer(
-                  child: ClipPath(
-                    clipper: InvertedClipper(_path, _width, _height),
-                    child: Container(
-                      color: widget.overlayColor,
-                    ),
-                  ),
-                ),
-                widget.drawPath(_path),
-              ],
+                );
+              },
             ),
-          ),
-        );
-      },
     );
   }
 
-  void onScaleStart(_) {
+  void onScaleStart(dynamic _) {
     _dataTransitionStart = null; // Reset for update
   }
 
@@ -193,7 +216,7 @@ class _CustomImageCropState extends State<CustomImageCrop>
         CropImageData(scale: event.scale, angle: event.rotationAngle);
   }
 
-  void onMoveStart(_) {
+  void onMoveStart(dynamic _) {
     _dataTransitionStart = null; // Reset for update
   }
 
@@ -204,6 +227,7 @@ class _CustomImageCropState extends State<CustomImageCrop>
   Path _getPath(double cropWidth, double width, double height) {
     switch (widget.shape) {
       case CustomCropShape.Circle:
+      case CustomCropShape.CircleDottedLine:
         return Path()
           ..addOval(
             Rect.fromCircle(
@@ -211,7 +235,7 @@ class _CustomImageCropState extends State<CustomImageCrop>
               radius: cropWidth / 2,
             ),
           );
-      default:
+      case CustomCropShape.Square:
         return Path()
           ..addRect(
             Rect.fromCenter(
@@ -238,29 +262,31 @@ class _CustomImageCropState extends State<CustomImageCrop>
     final scale = data.scale;
     final clipPath = Path.from(_getPath(cropWidth, cropWidth, cropWidth));
     final matrix4Image = Matrix4.diagonal3(vector_math.Vector3.all(1))
-      ..translate(translateScale * data.x + cropWidth / 2,
-          translateScale * data.y + cropWidth / 2)
+      ..translate(
+        translateScale * data.x + cropWidth / 2,
+        translateScale * data.y + cropWidth / 2,
+      )
       ..scale(scale)
       ..rotateZ(data.angle);
     final bgPaint = Paint()
       ..color = widget.backgroundColor
       ..style = PaintingStyle.fill;
-    canvas.drawRect(Rect.fromLTWH(0, 0, cropWidth, cropWidth), bgPaint);
-    canvas.save();
-    canvas.clipPath(clipPath);
-    canvas.transform(matrix4Image.storage);
-    canvas.drawImage(_imageAsUIImage!,
-        Offset(-imageWidth / 2, -imageHeight / 2), widget.imagePaintDuringCrop);
-    canvas.restore();
+    canvas
+      ..drawRect(Rect.fromLTWH(0, 0, cropWidth, cropWidth), bgPaint)
+      ..save()
+      ..clipPath(clipPath)
+      ..transform(matrix4Image.storage)
+      ..drawImage(_imageAsUIImage!, Offset(-imageWidth / 2, -imageHeight / 2),
+          widget.imagePaintDuringCrop)
+      ..restore();
 
     // Optionally remove magenta from image by evaluating every pixel
     // See https://github.com/brendan-duncan/image/blob/master/lib/src/transform/copy_crop.dart
 
     // final bytes = await compute(computeToByteData, <String, dynamic>{'pictureRecorder': pictureRecorder, 'cropWidth': cropWidth});
 
-    ui.Picture picture = pictureRecorder.endRecording();
-    ui.Image image =
-        await picture.toImage(cropWidth.floor(), cropWidth.floor());
+    final picture = pictureRecorder.endRecording();
+    final image = await picture.toImage(cropWidth.floor(), cropWidth.floor());
 
     // Adding compute would be preferrable. Unfortunately we cannot pass an ui image to this.
     // A workaround would be to save the image and load it inside of the isolate
@@ -293,5 +319,6 @@ class _CustomImageCropState extends State<CustomImageCrop>
 
 enum CustomCropShape {
   Circle,
+  CircleDottedLine,
   Square,
 }

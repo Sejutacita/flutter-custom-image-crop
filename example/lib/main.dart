@@ -61,14 +61,14 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
       body: Column(
         children: [
-          Expanded(
-            child: CustomImageCrop(
-              cropController: controller,
-              // image: const AssetImage('assets/test.png'), // Any Imageprovider will work, try with a NetworkImage for example...
-              image: const NetworkImage(
-                  'https://upload.wikimedia.org/wikipedia/en/7/7d/Lenna_%28test_image%29.png'),
-              shape: CustomCropShape.Square,
+          CustomImageCrop(
+            cropController: controller,
+            // image: const AssetImage('assets/test.png'), // Any Imageprovider will work, try with a NetworkImage for example...
+            image: const NetworkImage(
+              'https://en.kepoper.com/wp-content/uploads/2021/11/ive-member-liz-profile-facts-tmi-2.jpg',
             ),
+            shape: CustomCropShape.CircleDottedLine,
+            height: 328,
           ),
           Row(
             children: [
