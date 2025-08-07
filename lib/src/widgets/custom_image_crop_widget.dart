@@ -4,15 +4,15 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:ui' as ui;
 
+import 'package:custom_image_crop/src/clippers/inverted_clipper.dart';
+import 'package:custom_image_crop/src/controllers/controller.dart';
+import 'package:custom_image_crop/src/models/model.dart';
+import 'package:custom_image_crop/src/painters/dotted_path_painter.dart';
 import 'package:flutter/material.dart';
 import 'package:gesture_x_detector/gesture_x_detector.dart';
 import 'package:vector_math/vector_math_64.dart' as vector_math;
 
-import '../clippers/inverted_clipper.dart';
-import '../controllers/controller.dart';
-import '../models/model.dart';
 import '../painters/circle_path_painter.dart';
-import '../painters/dotted_path_painter.dart';
 
 /// An image cropper that is customizable.
 /// You can rotate, scale and translate either
@@ -46,6 +46,10 @@ class CustomImageCrop extends StatefulWidget {
   /// The paint used when drawing an image before cropping
   final Paint imagePaintDuringCrop;
 
+  /// Whether to crop the image to the actual shape (circle/square)
+  /// If false, always crops to square regardless of preview shape
+  final bool isCropToShape;
+
   /// A custom image cropper widget
   ///
   /// Uses a `CustomImageCropController` to crop the image.
@@ -67,6 +71,9 @@ class CustomImageCrop extends StatefulWidget {
 
   final double width;
 
+  ///
+  /// Set `isCropToShape` to false if you want to keep the circular
+  /// preview but crop to a square when actually processing the image
   CustomImageCrop({
     required this.image,
     required this.cropController,
@@ -77,6 +84,7 @@ class CustomImageCrop extends StatefulWidget {
     this.shape = CustomCropShape.CircleDottedLine,
     this.cropPercentage = 0.62,
     this.drawPath = DottedCropPathPainter.drawPath,
+    this.isCropToShape = true,
     Paint? imagePaintDuringCrop,
     Key? key,
   })  : this.imagePaintDuringCrop = imagePaintDuringCrop ??
@@ -247,6 +255,22 @@ class _CustomImageCropState extends State<CustomImageCrop>
     }
   }
 
+  Path _getCropPath(double cropWidth, double width, double height) {
+    if (!widget.isCropToShape) {
+      // Always return square path for actual cropping when isCropToShape is false
+      return Path()
+        ..addRect(
+          Rect.fromCenter(
+            center: Offset(width / 2, height / 2),
+            width: cropWidth,
+            height: cropWidth,
+          ),
+        );
+    }
+    // Use the same path as preview when isCropToShape is true
+    return _getPath(cropWidth, width, height);
+  }
+
   @override
   Future<MemoryImage?> onCropImage() async {
     if (_imageAsUIImage == null) {
@@ -260,7 +284,7 @@ class _CustomImageCropState extends State<CustomImageCrop>
     final cropWidth = max(imageWidth, imageHeight).toDouble();
     final translateScale = cropWidth / uiWidth;
     final scale = data.scale;
-    final clipPath = Path.from(_getPath(cropWidth, cropWidth, cropWidth));
+    final clipPath = Path.from(_getCropPath(cropWidth, cropWidth, cropWidth));
     final matrix4Image = Matrix4.diagonal3(vector_math.Vector3.all(1))
       ..translate(
         translateScale * data.x + cropWidth / 2,
